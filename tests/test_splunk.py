@@ -12,6 +12,7 @@ from sputil.splunk import Indexer, Searcher, ITSIManager
 from sputil.base import SPINDEX
 
 import urllib3
+import time
 urllib3.disable_warnings()
 
 
@@ -51,11 +52,38 @@ class ITSIManagerTest(unittest.TestCase):
     def test_get_kpi_base_searches(self):
         searches = self.manager.get_kpi_base_searches()
         self.assertGreater(len(searches), 0)
+        for search in searches:
+            if search['title'] == 'kpitest2':
+                self.manager.del_kpi_base_search(title='kpitest2')
 
     def test_add_kpi_base_search(self):
-        rs = self.manager.add_kpi_base_search(title='test2', desc='test')
+        rs = self.manager.add_kpi_base_search(title='kpitest2', desc='test')
         if '_key' in rs:
             self.assertTrue(True)
+
+    def test_get_uuid(self):
+        uuids = []
+        for x in range(1, 10000):  # @UnusedVariable
+            uuids.append(self.manager.get_uuid())
+        self.assertEqual(len(uuids), len(list(sorted(set(uuids)))))
+
+    def test_add_kpi_base_search_metrics(self):
+        metrics = []
+        metric = {}
+        metric['aggregate_statop'] = 'avg'
+        metric['entity_statop'] = 'avg'
+        metric['threshold_field'] = 'threshold_field'
+        metric['title'] = 'threshold_field'
+        metric['unit'] = ''
+        metric['_key'] = self.manager.get_uuid()
+        metrics.append(metric)
+        self.manager.add_kpi_base_search_metrics('kpitest2', metrics)
+        time.sleep(1)
+        for kpi_base_search in self.manager.get_kpi_base_searches():
+            if kpi_base_search['title'] == 'kpitest2':
+                title = kpi_base_search['metrics'][0]['title']
+                self.assertEqual(title, 'threshold_field')
+                print kpi_base_search
 
 
 if __name__ == '__main__':
