@@ -9,4 +9,4 @@ When you index, only the data file and the index name are automatically indexed 
 This is the ability to use SPL in environments where web browsers are not available.
 # 3. Simple Diag
 It automatically checks the items to be checked by default during periodic inspection and saves the problematic part in the system.
-
+# 4. Simple StressTest
