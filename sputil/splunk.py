@@ -8,6 +8,7 @@ from base import SplunkBase, SPINDEX
 from splunklib import results
 import requests
 import json
+import uuid
 
 
 class SPException(Exception):
@@ -62,6 +63,27 @@ class ITSIManager(SplunkBase):
         base_uri = 'https://%s:8089/servicesNS/nobody/SA-ITOA/itoa_interface'
         self.base_uri = base_uri % (self.config['splunk_ip'],)
 
+    def get_uuid(self,):
+        return str(uuid.uuid1()).replace('-', '')[:24]
+
+    def add_kpi_base_search_metrics(self, title, metrics):
+        kpi_base = None
+        for kpi_base_search in self.get_kpi_base_searches():
+            if kpi_base_search['title'] == title:
+                kpi_base = kpi_base_search
+        if kpi_base is not None:
+            kpi_base['metrics'] = metrics
+            self.itsi_uri = ('%s/%s/%s') % (self.base_uri,
+                                            'kpi_base_search',
+                                            kpi_base['_key'])
+            req = requests.put(self.itsi_uri,
+                               auth=('admin', 'changepassword'),
+                               data=json.dumps(kpi_base),
+                               verify=False)
+            return json.loads(req.content)
+        else:
+            return None
+
     def get_kpi_base_searches(self):
         self.itsi_uri = ('%s/%s') % (self.base_uri, 'kpi_base_search',)
         req = requests.get(self.itsi_uri, auth=('admin', 'changepassword'),
@@ -74,10 +96,9 @@ class ITSIManager(SplunkBase):
         post_data = {}
         post_data['fields'] = 'title'
         post_data['filter'] = {"title": title}
-        req = requests.delete(self.itsi_uri, auth=('admin', 'changepassword'),
-                              data=json.dumps(post_data),
-                              verify=False)
-        return json.loads(req.content)
+        requests.delete(self.itsi_uri, auth=('admin', 'changepassword'),
+                        data=json.dumps(post_data),
+                        verify=False)
 
     def add_kpi_base_search(self, title, desc=''):
         self.itsi_uri = ('%s/%s') % (self.base_uri, 'kpi_base_search',)
