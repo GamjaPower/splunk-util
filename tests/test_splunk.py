@@ -66,6 +66,10 @@ class ITSIManagerTest(unittest.TestCase):
         for x in range(1, 10000):  # @UnusedVariable
             uuids.append(self.manager.get_uuid())
         self.assertEqual(len(uuids), len(list(sorted(set(uuids)))))
+        
+    def test_get_kpi_services(self):
+        for x in self.manager.get_kpi_ids():
+            print x
 
     def test_add_kpi_base_search_metrics(self):
         metrics = []

@@ -66,6 +66,26 @@ class ITSIManager(SplunkBase):
     def get_uuid(self,):
         return str(uuid.uuid1()).replace('-', '')[:24]
 
+    def get_services(self,):
+        self.itsi_uri = ('%s/%s') % (self.base_uri, 'service',)
+        req = requests.get(self.itsi_uri,
+                           auth=(self.config['splunk_id'],
+                                 self.config['splunk_password']),
+                           verify=False)
+        return json.loads(req.content)
+    
+    def get_kpi_ids(self):
+        self.itsi_uri = ('%s/%s') % (self.base_uri, 'service',)
+        req = requests.get(self.itsi_uri,
+                           auth=(self.config['splunk_id'],
+                                 self.config['splunk_password']),
+                           verify=False)
+        tag_kpi_ids = {}
+        for service in json.loads(req.content):
+            for kpi in service['kpis']:
+                tag_kpi_ids[str(kpi['title'])] = kpi['_key']
+        return tag_kpi_ids
+
     def add_kpi_base_search_metrics(self, title, metrics):
         kpi_base = None
         for kpi_base_search in self.get_kpi_base_searches():
@@ -77,7 +97,8 @@ class ITSIManager(SplunkBase):
                                             'kpi_base_search',
                                             kpi_base['_key'])
             req = requests.put(self.itsi_uri,
-                               auth=('admin', 'changepassword'),
+                               auth=(self.config['splunk_id'],
+                                     self.config['splunk_password']),
                                data=json.dumps(kpi_base),
                                verify=False)
             return json.loads(req.content)
@@ -86,7 +107,9 @@ class ITSIManager(SplunkBase):
 
     def get_kpi_base_searches(self):
         self.itsi_uri = ('%s/%s') % (self.base_uri, 'kpi_base_search',)
-        req = requests.get(self.itsi_uri, auth=('admin', 'changepassword'),
+        req = requests.get(self.itsi_uri,
+                           auth=(self.config['splunk_id'],
+                                 self.config['splunk_password']),
                            verify=False)
         return json.loads(req.content)
 
@@ -96,7 +119,8 @@ class ITSIManager(SplunkBase):
         post_data = {}
         post_data['fields'] = 'title'
         post_data['filter'] = {"title": title}
-        requests.delete(self.itsi_uri, auth=('admin', 'changepassword'),
+        requests.delete(self.itsi_uri, auth=(self.config['splunk_id'],
+                                             self.config['splunk_password']),
                         data=json.dumps(post_data),
                         verify=False)
 
@@ -105,7 +129,75 @@ class ITSIManager(SplunkBase):
         post_data = {}
         post_data['title'] = title
         post_data['description'] = desc
-        req = requests.post(self.itsi_uri, auth=('admin', 'changepassword'),
+        req = requests.post(self.itsi_uri,
+                            auth=(self.config['splunk_id'],
+                                  self.config['splunk_password']),
                             data=json.dumps(post_data),
                             verify=False)
         return json.loads(req.content)
+
+    def fill_kpi(self, kpi, base_title, base_id, base_spl,
+                 metric_title, metric_id, service_id, unit):
+
+        uuid = self.get_uuid()
+        kpi['base_search'] = base_spl
+        kpi['base_search_id'] = base_id
+        kpi['base_search_metric'] = metric_id
+        kpi['cohesive_ad'] = '{sensitivity: 8}'
+        kpi['cohesive_anomaly_detection_is_enabled'] = False
+        kpi['description'] = metric_title
+        kpi['enabled'] = 1
+        kpi['entity_alias_filtering_fields'] = None
+        kpi['entity_breakdown_id_fields'] = "host"
+        kpi['entity_id_fields'] = "host"
+        kpi['entity_statop'] = "avg"
+        kpi['kpi_base_search'] = base_spl
+        kpi['metric_qualifier'] = ""
+        kpi['search'] = base_spl
+        sagg = "%s | `aggregate_raw_into_single_value(avg, %s, 5)` |" + \
+            " `assess_severity(%s, %s)` " % (base_spl, metric_title,
+                                             service_id, uuid)
+        kpi['search_aggregate'] = sagg
+        salert = "%s | `aggregate_raw_into_service(avg, %s)` |" + \
+            " `assess_severity(%s, %s, true, true)` eval kpi=\"%s\", " + \
+            " urgency=\"5\", alert_period=\"1\", serviceid=\"%s\" | " + \
+            " `assess_urgency` " % (base_spl, metric_title,
+                                    service_id, uuid,
+                                    metric_title, service_id)
+        kpi['search_alert'] = salert
+        kpi['search_alert_earliest'] = "5"
+        kpi['search_alert_entities'] = ""
+        kpi['search_buckets'] = ""
+        sentities = "%s | `aggregate_raw_into_single_value(avg, %s, 5)` |" + \
+            " `assess_severity(%s, %s)` " % (base_spl, metric_title,
+                                             service_id, uuid)
+        kpi['search_entities'] = sentities
+        kpi['search_occurrences'] = 1
+        scompare = "%s | `aggregate_raw_and_compare(avg, %s, 5)` |" + \
+            " `assess_severity(%s, %s)` " % (base_spl, metric_title,
+                                             service_id, uuid)
+        kpi['search_time_compare'] = scompare
+        sseries = "%s | " + \
+            "`aggregate_raw_into_service_time_series(avg, %s, 5)` |" + \
+            " `assess_severity(%s, %s)` " % (base_spl, metric_title,
+                                             service_id, uuid)
+        kpi['search_time_series'] = sseries
+        kpi['search_time_series_aggregate'] = sseries
+        kpi['search_time_series_entities'] = sseries
+        kpi['search_type'] = "shared_base"
+        kpi['sec_grp'] = "default_itsi_security_group"
+        kpi['service_id'] = "0ed0273b-3fe8-4cdd-8328-651984c3ff45"
+        kpi['service_title'] = base_title
+        kpi['source'] = ""
+        kpi['target'] = ""
+        kpi['threshold_field'] = metric_title
+        kpi['time_variate_thresholds'] = False
+        kpi['title'] = metric_title
+        kpi['trending_ad'] = "{sensitivity: 8}"
+        kpi['type'] = base_spl
+        kpi['base_search'] = "kpis_primary"
+        kpi['tz_offset'] = None
+        kpi['unit'] = unit
+        kpi['urgency'] = "5"
+        kpi['_key'] = uuid
+        kpi['_owner'] = "nobody"
