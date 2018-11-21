@@ -11,7 +11,7 @@ from pyutil.fileutil import write_file
 
 
 SPINDEX = 'sputil-test'
-VERSION = '0.3.5'
+VERSION = '0.3.6'
 
 
 class SplunkBase(object):
