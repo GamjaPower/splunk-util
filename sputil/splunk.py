@@ -74,6 +74,7 @@ class ITSIManager(SplunkBase):
                            verify=False)
         return json.loads(req.content)
     
+    # title, _key, thresholdLevels
     def get_kpi_ids(self):
         self.itsi_uri = ('%s/%s') % (self.base_uri, 'service',)
         req = requests.get(self.itsi_uri,
@@ -83,7 +84,7 @@ class ITSIManager(SplunkBase):
         tag_kpi_ids = {}
         for service in json.loads(req.content):
             for kpi in service['kpis']:
-                tag_kpi_ids[str(kpi['title'])] = kpi['_key']
+                tag_kpi_ids[str(kpi['title'])] = kpi
         return tag_kpi_ids
 
     def add_kpi_base_search_metrics(self, title, metrics):
